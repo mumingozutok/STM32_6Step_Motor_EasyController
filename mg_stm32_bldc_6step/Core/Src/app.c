@@ -22,6 +22,8 @@ extern UART_HandleTypeDef hlpuart1;
 extern TIM_HandleTypeDef htim1;
 uint8_t rxData_UART;
 
+uint8_t first_value = 0;
+
 uint16_t pwm_duty = 25;
 
 osThreadId_t appTaskHandle;
@@ -47,18 +49,56 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Transmit(&hlpuart1, &rxData_UART, 1, HAL_MAX_DELAY);
 		HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
 
-		//osdelay = rxData_UART;
+	    if((first_value == 1) & (rxData_UART >= 0) & (rxData_UART <= 100))
+	    {
+	    	pwm_duty = rxData_UART;
+	    }
+		first_value = 1;
 	}
+}
+
+uint8_t readH1(){
+	if(HAL_GPIO_ReadPin(HALL_H1_GPIO_Port, HALL_H1_Pin) == GPIO_PIN_SET){
+		return 1;
+	}
+	else return 0;
+}
+
+uint8_t readH2(){
+	if(HAL_GPIO_ReadPin(HALL_H2_GPIO_Port, HALL_H2_Pin) == GPIO_PIN_SET){
+		return 1;
+	}
+	else return 0;
+}
+
+uint8_t readH3(){
+	if(HAL_GPIO_ReadPin(HALL_H3_GPIO_Port, HALL_H3_Pin) == GPIO_PIN_SET){
+		return 1;
+	}
+	else return 0;
 }
 
 uint8_t Read_Hall_Sensors(void) {
 	uint8_t hall_state = 0;
-
+    /*
 	if (HAL_GPIO_ReadPin(HALL_H1_GPIO_Port, HALL_H1_Pin) == GPIO_PIN_SET) hall_state |= 0x01;
 	if (HAL_GPIO_ReadPin(HALL_H2_GPIO_Port, HALL_H2_Pin) == GPIO_PIN_SET) hall_state |= 0x02;
 	if (HAL_GPIO_ReadPin(HALL_H3_GPIO_Port, HALL_H3_Pin) == GPIO_PIN_SET) hall_state |= 0x04;
+    */
+	if(readH1() == 1 & readH2() == 0 & readH3() == 0) 		return 1;
+	else if(readH1() == 1 & readH2() == 1 & readH3() == 0) 	return 2;
+	else if(readH1() == 0 & readH2() == 1 & readH3() == 0) 	return 3;
+	else if(readH1() == 0 & readH2() == 1 & readH3() == 1) 	return 4;
+	else if(readH1() == 0 & readH2() == 0 & readH3() == 1) 	return 5;
+	else if(readH1() == 1 & readH2() == 0 & readH3() == 1) 	return 6;
+	else{
+		//fault
+		return 0;
+	}
 
-	return hall_state;
+
+
+	//return hall_state;
 }
 
 void set_mosfets(uint16_t duty, uint8_t uh, uint8_t vh, uint8_t wh, uint8_t ul, uint8_t vl, uint8_t wl)
@@ -71,7 +111,7 @@ void set_mosfets(uint16_t duty, uint8_t uh, uint8_t vh, uint8_t wh, uint8_t ul, 
 	HAL_GPIO_WritePin(GPIO_VL_GPIO_Port, GPIO_VL_Pin, 1*vl);
 	HAL_GPIO_WritePin(GPIO_WL_GPIO_Port, GPIO_WL_Pin, 1*wl);
 }
-
+/*
 void motor_step(uint8_t step_val){
 	switch(step_val){
 	case 6:
@@ -198,45 +238,46 @@ void motor_step(uint8_t step_val){
 		break;
 	}
 }
-
+*/
 
 void motor_commutation(uint8_t step_val){
 	switch(step_val){
 	case 1:
-				     //du,    	uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 1, 0, 0,  0,  1,  0);
+				     //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 0, 0, 1,  1,  0,  0);
 
 		break;
 
 	case 2:
-				     //du,      uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 1, 0, 0,  0,  0,  1);
+				     //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 0, 0, 1,  0,  1,  0);
 		break;
 
 	case 3:
-			         //du,      uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 0, 1, 0,  0,  0,  1);
+			         //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 1, 0, 0,  0,  1,  0);
 
 		break;
 
 	case 4:
-			  	     //du,     uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 0, 1, 0,  1,  0,  0);
+			  	     //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 1, 0, 0,  0,  0,  1);
 
 		break;
 
 	case 5:
-				     //du,      uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 0, 0, 1,  1,  0,  0);
+				     //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 0, 1, 0,  0,  0,  1);
 		break;
 
 	case 6:
-				     //du,      uh,vh,wh, ul, vl, wl
-		set_mosfets(pwm_duty, 0, 0, 1,  0,  1,  0);
+				     //du,    uh,vh,wh, ul, vl, wl
+		set_mosfets(pwm_duty, 0, 1, 0,  1,  0,  0);
 
 		break;
 	}
 }
+/*
 // EXTI (Harici Kesme) Callback Fonksiyonu
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	hall_state = Read_Hall_Sensors();
@@ -247,24 +288,25 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		if(hall_state_buf_cntr == 100) hall_state_buf_cntr = 0;
 	}
 
-	motor_step(hall_state);
+	motor_commutation(hall_state);
 }
+*/
 
 
 void StartAppTask(void *argument)
 {
 	uint8_t test_step[6] = {1,2,3,4,5,6};
 
-	pwm_duty = 25;
+	pwm_duty = 32;
 
 	static uint8_t test_step_i = 0;
 	/* Infinite loop */
 	for(;;)
 	{
 		//motor_step(test_step[test_step_i++]);
-		if(test_step_i == 6) test_step_i = 0;
+		//if(test_step_i == 6) test_step_i = 0;
 
-		motor_commutation(test_step[test_step_i++]);
+		//motor_commutation(test_step[test_step_i++]);
 
 		/*if(pwm_duty < 60) {
 			pwm_duty++;
@@ -286,7 +328,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     		hall_state_buf[hall_state_buf_cntr++] = hall_state;
     		if(hall_state_buf_cntr == 100) hall_state_buf_cntr = 0;
     	}
-    	motor_step(hall_state);
+    	motor_commutation(hall_state);
+    	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_4);
     }
 }
 
@@ -296,7 +339,7 @@ void init_app()
 	HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
 
 
-    //HAL_TIMEx_HallSensor_Start_IT(&htim2);
+    HAL_TIMEx_HallSensor_Start_IT(&htim2);
 
 	TIM1->CCR1 = 0;
 	TIM1->CCR2 = 0;
