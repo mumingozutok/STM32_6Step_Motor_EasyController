@@ -42,20 +42,7 @@ int hall_position = 0;
 uint8_t osdelay = 10;
 
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if (huart->Instance == LPUART1)
-	{
-		HAL_UART_Transmit(&hlpuart1, &rxData_UART, 1, HAL_MAX_DELAY);
-		HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
 
-	    if((first_value == 1) & (rxData_UART >= 0) & (rxData_UART <= 100))
-	    {
-	    	pwm_duty = rxData_UART;
-	    }
-		first_value = 1;
-	}
-}
 
 uint8_t readH1(){
 	if(HAL_GPIO_ReadPin(HALL_H1_GPIO_Port, HALL_H1_Pin) == GPIO_PIN_SET){
@@ -99,6 +86,34 @@ uint8_t Read_Hall_Sensors(void) {
 
 
 	//return hall_state;
+}
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == LPUART1)
+	{
+		HAL_UART_Transmit(&hlpuart1, &rxData_UART, 1, HAL_MAX_DELAY);
+		HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
+
+	    if((first_value == 1) & (rxData_UART >= 0) & (rxData_UART <= 100))
+	    {
+	    	if(pwm_duty == 0)
+	    	{
+	    		pwm_duty = rxData_UART;
+
+	    		hall_state = Read_Hall_Sensors();
+	    		motor_commutation(hall_state);
+	    	}
+	    	else
+	    	{
+	    		pwm_duty = rxData_UART;
+	    	}
+
+
+	    }
+		first_value = 1;
+	}
 }
 
 void set_mosfets(uint16_t duty, uint8_t uh, uint8_t vh, uint8_t wh, uint8_t ul, uint8_t vl, uint8_t wl)
@@ -344,6 +359,10 @@ void init_app()
 	TIM1->CCR1 = 0;
 	TIM1->CCR2 = 0;
 	TIM1->CCR3 = 0;
+
+	hall_state = Read_Hall_Sensors();
+	motor_commutation(hall_state);
+
 
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
