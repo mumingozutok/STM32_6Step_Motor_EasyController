@@ -14,12 +14,18 @@
 #define ENABLE 1
 #define DISABLE 0
 
+#define ADC_BUFFER_SIZE 3*1000
+
 volatile uint8_t hall_state, hall_state_old;
 volatile uint8_t hall_state_buf[100];
 volatile uint16_t hall_state_buf_cntr = 0;
 
 extern UART_HandleTypeDef hlpuart1;
 extern TIM_HandleTypeDef htim1;
+
+extern ADC_HandleTypeDef hadc1;
+extern DMA_HandleTypeDef hdma_adc1;
+
 uint8_t rxData_UART;
 
 uint8_t first_value = 0;
@@ -39,10 +45,18 @@ extern TIM_HandleTypeDef htim2;
 
 int hall_position = 0;
 
+int adc_value = 0;
+
 uint8_t osdelay = 10;
 
 
+uint16_t adcBuffer[ADC_BUFFER_SIZE];
 
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	adc_value = adcBuffer[0];
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_4);
+}
 
 uint8_t readH1(){
 	if(HAL_GPIO_ReadPin(HALL_H1_GPIO_Port, HALL_H1_Pin) == GPIO_PIN_SET){
@@ -344,7 +358,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     		if(hall_state_buf_cntr == 100) hall_state_buf_cntr = 0;
     	}
     	motor_commutation(hall_state);
-    	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_4);
+
     }
 }
 
@@ -353,8 +367,7 @@ void init_app()
 
 	HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
 
-
-    HAL_TIMEx_HallSensor_Start_IT(&htim2);
+	HAL_TIMEx_HallSensor_Start_IT(&htim2);
 
 	TIM1->CCR1 = 0;
 	TIM1->CCR2 = 0;
@@ -362,6 +375,12 @@ void init_app()
 
 	hall_state = Read_Hall_Sensors();
 	motor_commutation(hall_state);
+
+	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)adcBuffer, ADC_BUFFER_SIZE);
+
+
+
+
 
 
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
