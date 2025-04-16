@@ -61,6 +61,7 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
+#define B1_EXTI_IRQn EXTI15_10_IRQn
 #define LPUART1_TX_Pin GPIO_PIN_2
 #define LPUART1_TX_GPIO_Port GPIOA
 #define LPUART1_RX_Pin GPIO_PIN_3
@@ -73,8 +74,9 @@ void Error_Handler(void);
 #define GPIO_VL_GPIO_Port GPIOB
 #define GPIO_WL_Pin GPIO_PIN_1
 #define GPIO_WL_GPIO_Port GPIOB
-#define HALL_H3_Pin GPIO_PIN_10
-#define HALL_H3_GPIO_Port GPIOB
+#define ENCO_Z_Pin GPIO_PIN_10
+#define ENCO_Z_GPIO_Port GPIOB
+#define ENCO_Z_EXTI_IRQn EXTI15_10_IRQn
 #define PWM_UH_Pin GPIO_PIN_8
 #define PWM_UH_GPIO_Port GPIOA
 #define PWM_VH_Pin GPIO_PIN_9
@@ -85,10 +87,10 @@ void Error_Handler(void);
 #define T_SWDIO_GPIO_Port GPIOA
 #define T_SWCLK_Pin GPIO_PIN_14
 #define T_SWCLK_GPIO_Port GPIOA
-#define HALL_H1_Pin GPIO_PIN_15
-#define HALL_H1_GPIO_Port GPIOA
-#define HALL_H2_Pin GPIO_PIN_3
-#define HALL_H2_GPIO_Port GPIOB
+#define ENCO_A_Pin GPIO_PIN_15
+#define ENCO_A_GPIO_Port GPIOA
+#define ENCO_B_Pin GPIO_PIN_3
+#define ENCO_B_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
