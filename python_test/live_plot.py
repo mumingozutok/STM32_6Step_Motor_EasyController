@@ -1,72 +1,79 @@
 import serial
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.widgets import TextBox, Button
 from collections import deque
 
-# === Ayarlar ===
-PORT = 'COM26'        # STM32'nin bağlı olduğu COM portunu buraya yaz
-BAUD = 115200
-MAX_POINTS = 500     # Grafikte kaç veri noktası tutulsun?
+# Seri port ayarları
+ser = serial.Serial('COM26', 115200, timeout=1)
 
-# === UART başlat ===
-ser = serial.Serial(PORT, BAUD, timeout=1)
+# Veri saklamak için dairesel buffer
+max_len = 200
+encoder_pos_data = deque([0]*max_len, maxlen=max_len)
+comm_step_data = deque([0]*max_len, maxlen=max_len)
+loop_state_data = deque([0]*max_len, maxlen=max_len)
 
-# === Grafik verileri ===
-positions = deque(maxlen=MAX_POINTS)
-steps = deque(maxlen=MAX_POINTS)
-states = deque(maxlen=MAX_POINTS)
-samples = deque(maxlen=MAX_POINTS)
+# Şekil ve alt grafik oluştur
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8))
+fig.subplots_adjust(bottom=0.25)
 
-# === Başlangıç değerleri ===
-for _ in range(MAX_POINTS):
-    positions.append(0)
-    steps.append(0)
-    states.append(0)
-    samples.append(0)
+# PWM textbox için konum
+axbox = plt.axes([0.15, 0.05, 0.2, 0.075])
+text_box = TextBox(axbox, 'PWM Duty', initial='25')
 
-# === Matplotlib hazırlığı ===
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 6))
-fig.tight_layout(pad=2)
+# PWM gönderme butonu
+axbutton = plt.axes([0.4, 0.05, 0.1, 0.075])
+button = Button(axbutton, 'Gönder')
 
-def update(frame):
+
+def send_pwm(event):
     try:
-        line = ser.readline().decode('utf-8').strip()
-        if line:
-            parts = line.split(',')
-            if len(parts) == 3:
-                pos = int(parts[0])
-                step = int(parts[1])
-                state = int(parts[2])
+        pwm_value = int(text_box.text)
+        if 0 <= pwm_value <= 100:
+            pwm_command = f'pwm:{pwm_value}\r\n'
+            ser.write(pwm_command.encode())
+            print(f"PWM gönderildi: {pwm_value}")
+        else:
+            print("PWM 0-100 arasında olmalı.")
+    except ValueError:
+        print("Geçersiz PWM değeri.")
 
-                positions.append(pos)
-                steps.append(step)
-                states.append(state)
-                samples.append(samples[-1] + 1)
+button.on_clicked(send_pwm)
 
-                # Güncelleme
-                ax1.clear()
-                ax2.clear()
-                ax3.clear()
+# Grafik çizim fonksiyonu
+def animate(i):
+    try:
+        line = ser.readline().decode().strip()
+        if line.startswith("pwm:"):
+            return  # PWM cevabı ise çizim yapılmaz
+        parts = line.split(',')
+        if len(parts) == 3:
+            encoder_pos = int(parts[0])
+            comm_step = int(parts[1])
+            loop_state = int(parts[2])
 
-                ax1.plot(samples, positions, label="Encoder Pos")
-                ax2.plot(samples, steps, label="Commutation Step", color='orange')
-                ax3.plot(samples, states, label="Loop State", color='green')
+            encoder_pos_data.append(encoder_pos)
+            comm_step_data.append(comm_step)
+            loop_state_data.append(loop_state)
 
-                ax1.set_ylabel("Encoder")
-                ax2.set_ylabel("Step")
-                ax3.set_ylabel("State")
-                ax3.set_xlabel("Sample")
+            ax1.clear()
+            ax2.clear()
+            ax3.clear()
 
-                ax1.legend()
-                ax2.legend()
-                ax3.legend()
+            ax1.plot(encoder_pos_data, label="Encoder Pos")
+            ax1.set_title("Encoder Position")
+            ax1.grid(True)
 
-                ax1.grid(True)
-                ax2.grid(True)
-                ax3.grid(True)
+            ax2.plot(comm_step_data, label="Comm Step", color='orange')
+            ax2.set_title("Commutation Step")
+            ax2.grid(True)
 
+            ax3.plot(loop_state_data, label="Loop State", color='green')
+            ax3.set_title("Loop State")
+            ax3.grid(True)
     except Exception as e:
-        print("Hata:", e)
+        print(f"Hata: {e}")
 
-ani = animation.FuncAnimation(fig, update, interval=50)
+ani = animation.FuncAnimation(fig, animate, interval=100)
+plt.tight_layout()
 plt.show()
