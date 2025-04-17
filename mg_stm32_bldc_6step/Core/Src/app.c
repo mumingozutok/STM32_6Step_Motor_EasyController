@@ -7,18 +7,24 @@
 #include "main.h"
 #include "app.h"
 
+extern TIM_HandleTypeDef htim3;
+
 
 extern UART_HandleTypeDef hlpuart1;
 extern TIM_HandleTypeDef htim1;
 uint8_t rxData_UART;
 
 uint8_t first_value = 0;
-
 uint16_t pwm_duty = 25;
+uint16_t target_pwm_duty = 50;
+volatile uint8_t motor_running = 0;
+
 uint16_t encoder_position = 0;
 
-
 extern TIM_HandleTypeDef htim2;
+
+volatile uint32_t counter_100us = 0;
+volatile uint8_t encoder_timer_overflow_flag = 0;
 
 typedef struct {
 	uint16_t encoder_position;
@@ -28,13 +34,23 @@ typedef struct {
 
 sEncCommDebug encCommDebugData;
 
-uint16_t encoder_debug_buf_cntr = 0;
+#define ENCODER_PPR 2048
+#define COMMUTATION_OFFSET 0
 
-#define LOOP_STATE_FIRST_IGNITION 0
-#define LOOP_STATE_1 1
-#define LOOP_STATE_2 2
-#define LOOP_STATE_3 3
-#define LOOP_STATE_RUN 4
+uint16_t encoder_commutation_table[ENCODER_PPR];
+uint8_t commutation_sequence[6] = {2,3,4,5,6,1};
+
+//#define TEST_ENCODER
+
+void buildCommutationTable()
+{
+	uint16_t i;
+
+	for(i=0;i<ENCODER_PPR;i++)
+	{
+		encoder_commutation_table[i] = commutation_sequence[(i*10*6/ENCODER_PPR) % 6];
+	}
+}
 
 //#define TEST_ENCODER
 
@@ -135,23 +151,11 @@ void encoder_init(void)
 	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL); // Encoder mode başlat
 }
 
-static uint8_t commutation_step = 1;
-void commutate_motor()
-{
-#ifdef TEST_ENCODER
-	commutation_step++;
-	if(commutation_step > 6) commutation_step = 1;
-#else
-	motor_commutation(commutation_step++);
-	if(commutation_step > 6) commutation_step = 1;
-#endif
-}
-
 uint16_t get_test_encoder_val(uint8_t reset){
-	static uint16_t test_encoder_position = 0;
+	static int16_t test_encoder_position = -5;
 
 	if(reset == 1){
-		test_encoder_position = 0;
+		test_encoder_position = -5;
 	}
 
 	else{
@@ -164,45 +168,113 @@ uint16_t get_test_encoder_val(uint8_t reset){
 uint16_t get_encoder_value(){
 	uint16_t ret;
 #ifdef TEST_ENCODER
-		ret = get_test_encoder_val(0);
+	ret = get_test_encoder_val(0);
 #else
-		ret = __HAL_TIM_GET_COUNTER(&htim2);
+	ret = __HAL_TIM_GET_COUNTER(&htim2);
 #endif
-		return ret;
+	return ret;
 }
 
 void reset_encoder_value(){
 #ifdef TEST_ENCODER
-		get_test_encoder_val(1);
+	get_test_encoder_val(1);
 #else
-		__HAL_TIM_SET_COUNTER(&htim2, 0);
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
 #endif
 }
 
 void send_debug_struct_over_uart(sEncCommDebug *data)
 {
-    char uart_buf[64];
-    int len = snprintf(uart_buf, sizeof(uart_buf), "%u,%u,%u\r\n",
-                       data->encoder_position,
-                       data->comm_step,
-                       data->loop_state);
+	char uart_buf[64];
+	int len = snprintf(uart_buf, sizeof(uart_buf), "%u,%u,%u\r\n",
+			data->encoder_position,
+			data->comm_step,
+			data->loop_state);
 
-    HAL_UART_Transmit(&hlpuart1, (uint8_t *)uart_buf, len, HAL_MAX_DELAY);
+	HAL_UART_Transmit(&hlpuart1, (uint8_t *)uart_buf, len, HAL_MAX_DELAY);
+}
+
+volatile int32_t encoder_count;
+
+uint16_t encoder_shaft_pos; //this is the shaft position as encoder counts
+uint16_t encoder_commutation_pos; //this is shaft position from the beginning of current commuatiton sequence.
+volatile int16_t encoder_lastCount;
+
+void getEncoderCount()
+{
+	int16_t delta;
+	int16_t now = get_encoder_value();
+
+	delta = (int16_t)(now - encoder_lastCount);
+	encoder_lastCount = now;
+
+	encoder_count += delta;
+
+	int16_t shaft_pos_tmp = (encoder_count+ COMMUTATION_OFFSET ) % ENCODER_PPR;
+
+	if(shaft_pos_tmp < 0)
+		encoder_shaft_pos = ENCODER_PPR + shaft_pos_tmp;
+	else
+		encoder_shaft_pos = shaft_pos_tmp;
+}
+
+void forcedInitialization(){
+	motor_commutation(1);
+	HAL_Delay(10);
+	motor_commutation(2);
+	HAL_Delay(10);
+	motor_commutation(3);
+	HAL_Delay(10);
+	motor_commutation(4);
+	HAL_Delay(10);
+	motor_commutation(5);
+	HAL_Delay(10);
+	motor_commutation(6);
+	HAL_Delay(10);
+	motor_running = 1;
+	reset_encoder_value();
+}
+
+void init_Encoder(){
+	encoder_count=0;
+	encoder_lastCount=0;
+	encoder_shaft_pos=0;
+
+	buildCommutationTable();
+	forcedInitialization();
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM3)
+  {
+    // 100 µs'de çalışan kod
+
+	  counter_100us++;
+
+	  if((counter_100us % 1000) == 0){ //100ms
+		  if(target_pwm_duty <90){
+			  if((pwm_duty<target_pwm_duty) & motor_running) pwm_duty++;
+		  }
+	  }
+  }
+
+  else   if (htim->Instance == TIM2)
+  {
+    // Overflow/Underflow oldu
+    encoder_timer_overflow_flag = 1;
+  }
 }
 
 void init_app()
 {
-	uint16_t old_encoder_position = 0;
-	uint32_t loop_state = LOOP_STATE_FIRST_IGNITION;
-	uint8_t encoder_limit_buf[7] = {32,32,32,32,32,32,35};
-	uint8_t encoder_limit;
-	uint8_t encoder_limit_buf_cntr = 0;
-
 	HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
 	encoder_init();
 
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_TIM_Encoder_Start_IT(&htim2, TIM_CHANNEL_ALL); // Interrupt ile encoder başlat
+
+	HAL_TIM_Base_Start_IT(&htim3);  // Timer'ı interrupt ile başlat
 
 	TIM1->CCR1 = 0;
 	TIM1->CCR2 = 0;
@@ -212,73 +284,23 @@ void init_app()
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
+	init_Encoder();
+
 	while(1){
+		getEncoderCount();
 
-		encoder_position = get_encoder_value();
+		//check commutation position for trapezoid commutation if done by encoder
+		if(encoder_commutation_pos != encoder_commutation_table[encoder_shaft_pos])
+		{
+			encoder_commutation_pos = encoder_commutation_table[encoder_shaft_pos];
+			motor_commutation(encoder_commutation_pos);
 
-		switch(loop_state){
-
-		case LOOP_STATE_FIRST_IGNITION:
-			commutate_motor();
-			HAL_Delay(10);
-			reset_encoder_value();
-			commutate_motor();
-			HAL_Delay(10);
-
-			reset_encoder_value();
-			encoder_position = get_encoder_value();
-			commutate_motor();
-
-			loop_state = LOOP_STATE_1;
-			break;
-
-		case LOOP_STATE_1:
-			if(encoder_position > 22){
-				reset_encoder_value();
-				commutate_motor();
-				loop_state = LOOP_STATE_2;
-			}
-			else{
-				loop_state = LOOP_STATE_1;
-			}
-			break;
-
-		case LOOP_STATE_2:
-			if(encoder_position > 26){
-				reset_encoder_value();
-				commutate_motor();
-				loop_state = LOOP_STATE_RUN;
-			}
-			else{
-				loop_state = LOOP_STATE_2;
-			}
-			break;
-
-		case LOOP_STATE_RUN:
-			encoder_limit = encoder_limit_buf[encoder_limit_buf_cntr];
-			if(encoder_position > encoder_limit){
-				encoder_limit_buf_cntr++;
-				if(encoder_limit_buf_cntr == sizeof(encoder_limit_buf)){
-					encoder_limit_buf_cntr = 0;
-				}
-
-				reset_encoder_value();
-				commutate_motor();
-
-				loop_state = LOOP_STATE_RUN; //motorun durduğunu anlayapı ona göre tekrar başlatmamız gerekiyor.
-			}
-			break;
-		}
-
-
-		if(old_encoder_position != encoder_position){
-			old_encoder_position = encoder_position;
-
-			encCommDebugData.encoder_position = encoder_position;
-			encCommDebugData.comm_step = commutation_step;
-			encCommDebugData.loop_state = loop_state;
+			encCommDebugData.encoder_position = encoder_shaft_pos;
+			encCommDebugData.comm_step = encoder_commutation_pos;
+			//encCommDebugData.loop_state = 0;
 
 			send_debug_struct_over_uart(&encCommDebugData);
 		}
+
 	}
 }
