@@ -3,7 +3,7 @@ import csv
 import time
 
 # Port ayarları
-port = "COM26"
+port = "COM4"
 baudrate = 115200
 filename = f"enc_log_{int(time.time())}.csv"
 

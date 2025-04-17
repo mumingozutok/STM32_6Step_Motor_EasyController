@@ -97,6 +97,10 @@ void set_mosfets(uint16_t duty, uint8_t uh, uint8_t vh, uint8_t wh, uint8_t ul, 
 void motor_commutation(uint8_t step_val){
 	step_val = 7-step_val; //terse dönmesi için
 
+#ifdef TEST_ENCODER
+	return; //no commutation, just return
+#endif
+
 	switch(step_val){
 	case 1:
 		//du,    uh,vh,wh, ul, vl, wl
@@ -151,15 +155,19 @@ void encoder_init(void)
 	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL); // Encoder mode başlat
 }
 
+
 uint16_t get_test_encoder_val(uint8_t reset){
-	static int16_t test_encoder_position = -5;
+
+	static uint16_t test_encoder_position = 0;
 
 	if(reset == 1){
-		test_encoder_position = -5;
+		test_encoder_position = 0;
 	}
 
 	else{
 		test_encoder_position++;
+
+		if(test_encoder_position > 2048) test_encoder_position = 0;
 	}
 
 	return test_encoder_position;
@@ -195,27 +203,28 @@ void send_debug_struct_over_uart(sEncCommDebug *data)
 }
 
 volatile int32_t encoder_count;
-
 uint16_t encoder_shaft_pos; //this is the shaft position as encoder counts
 uint16_t encoder_commutation_pos; //this is shaft position from the beginning of current commuatiton sequence.
-volatile int16_t encoder_lastCount;
+volatile uint16_t encoder_lastCount;
 
 void getEncoderCount()
 {
 	int16_t delta;
-	int16_t now = get_encoder_value();
+	uint16_t now = get_encoder_value();
 
-	delta = (int16_t)(now - encoder_lastCount);
+	if(now<encoder_lastCount){
+		//overflow --> now: 3, encoder_lastCount = 65532
+		delta = (2048-encoder_lastCount) + now+1;
+	}
+
+	else{
+		delta = (int16_t)(now - encoder_lastCount);
+	}
+
 	encoder_lastCount = now;
 
-	encoder_count += delta;
-
-	int16_t shaft_pos_tmp = (encoder_count+ COMMUTATION_OFFSET ) % ENCODER_PPR;
-
-	if(shaft_pos_tmp < 0)
-		encoder_shaft_pos = ENCODER_PPR + shaft_pos_tmp;
-	else
-		encoder_shaft_pos = shaft_pos_tmp;
+	encoder_count = (encoder_count + delta) % ENCODER_PPR;
+	encoder_shaft_pos= encoder_count;
 }
 
 void forcedInitialization(){
@@ -254,7 +263,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	  if((counter_100us % 1000) == 0){ //100ms
 		  if(target_pwm_duty <90){
-			  if((pwm_duty<target_pwm_duty) & motor_running) pwm_duty++;
+			  if((pwm_duty<target_pwm_duty) & motor_running) {
+				  pwm_duty++;
+			  }
+			  else if((pwm_duty>target_pwm_duty) & motor_running) {
+				  pwm_duty--;
+			  }
 		  }
 	  }
   }
