@@ -15,8 +15,8 @@ extern TIM_HandleTypeDef htim1;
 uint8_t rxData_UART;
 
 uint8_t first_value = 0;
-uint16_t pwm_duty = 25;
-uint16_t target_pwm_duty = 50;
+uint16_t pwm_duty = 20;
+uint16_t target_pwm_duty = 20;
 volatile uint8_t motor_running = 0;
 
 uint16_t encoder_position = 0;
@@ -138,12 +138,29 @@ void motor_commutation(uint8_t step_val){
 	}
 }
 
+volatile uint32_t speed_counter_now= 0;
+volatile uint32_t speed_counter_old= 0;
+
+float rpm_measured = 0;
+float time_delta; //x*100us
+float period;
+
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	//float time_delta; //x*100us
 	if (GPIO_Pin == GPIO_PIN_10) // PB10'a bağlı Z sinyali
 	{
 		// Z darbesi geldiğinde yapılacak iş:
 		//__HAL_TIM_SET_COUNTER(&htim2, 0); // Sayaç sıfırlama
+
+		time_delta = (counter_100us - speed_counter_old) ;
+		time_delta = time_delta/1e+4;
+
+		rpm_measured = 60 / time_delta ;
+
+		speed_counter_old = counter_100us;
+
 
 		__NOP();
 		// veya başka bir şey: encoder_position = __HAL_TIM_GET_COUNTER(&htim2);
@@ -262,7 +279,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  counter_100us++;
 
 	  if((counter_100us % 1000) == 0){ //100ms
-		  if(target_pwm_duty <90){
+		  if(target_pwm_duty <99){
 			  if((pwm_duty<target_pwm_duty) & motor_running) {
 				  pwm_duty++;
 			  }
@@ -313,7 +330,7 @@ void init_app()
 			encCommDebugData.comm_step = encoder_commutation_pos;
 			//encCommDebugData.loop_state = 0;
 
-			send_debug_struct_over_uart(&encCommDebugData);
+			//send_debug_struct_over_uart(&encCommDebugData);
 		}
 
 	}
