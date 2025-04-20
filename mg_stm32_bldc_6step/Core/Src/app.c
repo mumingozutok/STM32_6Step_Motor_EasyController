@@ -40,6 +40,9 @@ uint8_t first_value = 0;
 uint16_t bufferCounter = 0;
 uint16_t pwm_duty = 16;
 
+uint8_t motor_running = 0;
+uint8_t motor_commutation_step = 1;
+
 
 volatile uint8_t hall_state, hall_state_old;
 
@@ -138,7 +141,7 @@ void motor_commutation(uint8_t step_val){
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     if (htim->Instance == TIM2) {
     	hall_state = Read_Hall_Sensors();
-    	motor_commutation(hall_state);
+    	//motor_commutation(hall_state);
     }
 }
 
@@ -153,6 +156,36 @@ void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
     }
 }
 
+void motor_step(){
+	motor_commutation(motor_commutation_step);
+	motor_commutation_step++;
+	if(motor_commutation_step > 6){
+		motor_commutation_step = 1;
+	}
+}
+
+void forcedInitialization(){
+	motor_step();
+	HAL_Delay(10);
+
+	motor_step();
+	HAL_Delay(10);
+
+	motor_step();
+	HAL_Delay(10);
+
+	motor_step();
+	HAL_Delay(10);
+
+	motor_step();
+	HAL_Delay(10);
+
+	motor_step();
+	//HAL_Delay(10);
+
+	motor_running = 1;
+}
+
 void init_app()
 {
 
@@ -164,8 +197,10 @@ void init_app()
 #ifdef HALLSENSOR
 		HAL_TIMEx_HallSensor_Start_IT(&htim2);
 		hall_state = Read_Hall_Sensors();
-		motor_commutation(hall_state);
+		//motor_commutation(hall_state);
 #endif
+
+
 
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
 
@@ -180,5 +215,6 @@ void init_app()
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
+	forcedInitialization();
 
 }
