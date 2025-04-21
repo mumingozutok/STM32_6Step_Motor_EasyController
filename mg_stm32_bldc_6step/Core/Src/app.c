@@ -140,19 +140,35 @@ void motor_commutation(uint8_t step_val){
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     if (htim->Instance == TIM2) {
-    	hall_state = Read_Hall_Sensors();
+    	//hall_state = Read_Hall_Sensors();
     	//motor_commutation(hall_state);
     }
 }
 
+uint8_t get_motor_commutation_step_minus_1(){
+	if(motor_commutation_step == 1) return 6;
+	else {
+		return (motor_commutation_step-1) ;
+	}
+}
+
 void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
 {
+	static uint32_t counter_10us = 0;
 
 	if (htim->Instance == TIM1){
-		start_ADC_Sensorless(hall_state);
+		if(motor_running == 0) return;
+		start_ADC_Sensorless(get_motor_commutation_step_minus_1());
+		//start_ADC_Sensorless(hall_state);
 	}
     if ((htim->Instance == TIM3)) { //10 us timer
-
+    	counter_10us++;
+    	if((counter_10us % 100000  == 0) & (motor_running == 1)){
+    		counter_10us = 0;
+    		if(pwm_duty < 50){
+    			pwm_duty = pwm_duty + 5;
+    		}
+    	}
     }
 }
 
