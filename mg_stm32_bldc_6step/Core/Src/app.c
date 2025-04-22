@@ -24,7 +24,9 @@ uint16_t encoder_position = 0;
 extern TIM_HandleTypeDef htim2;
 
 volatile uint32_t counter_100us = 0;
+uint32_t counter_100us_1 = 1;
 volatile uint8_t encoder_timer_overflow_flag = 0;
+uint32_t rpm_counter_x60 = 0;
 
 typedef struct {
 	uint16_t encoder_position;
@@ -142,6 +144,7 @@ volatile uint32_t speed_counter_now= 0;
 volatile uint32_t speed_counter_old= 0;
 
 float rpm_measured = 0;
+float rpm_value;
 float time_delta; //x*100us
 float period;
 
@@ -160,7 +163,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		rpm_measured = 60 / time_delta ;
 
 		speed_counter_old = counter_100us;
-
 
 		__NOP();
 		// veya başka bir şey: encoder_position = __HAL_TIM_GET_COUNTER(&htim2);
@@ -277,6 +279,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     // 100 µs'de çalışan kod
 
 	  counter_100us++;
+	  counter_100us_1++;
 
 	  if((counter_100us % 1000) == 0){ //100ms
 		  if(target_pwm_duty <99){
@@ -288,6 +291,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			  }
 		  }
 	  }
+
+  	if(((counter_100us_1 % 1000) == 0) & (motor_running == 1)){ //100 ms
+  		rpm_value = (rpm_counter_x60)*10;
+  		rpm_counter_x60 = 0;
+  		counter_100us_1 = 1;
+  		//PID_Loop();
+
+  	}
   }
 
   else   if (htim->Instance == TIM2)
@@ -325,6 +336,7 @@ void init_app()
 		{
 			encoder_commutation_pos = encoder_commutation_table[encoder_shaft_pos];
 			motor_commutation(encoder_commutation_pos);
+			rpm_counter_x60++;
 
 			encCommDebugData.encoder_position = encoder_shaft_pos;
 			encCommDebugData.comm_step = encoder_commutation_pos;
