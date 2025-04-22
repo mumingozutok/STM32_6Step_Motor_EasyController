@@ -31,6 +31,7 @@ volatile uint8_t state_buf[100];
 volatile uint16_t state_buf_cntr = 0;
 
 extern TIM_HandleTypeDef htim1;
+extern uint32_t rpm_counter_x10;
 
 extern TIM_HandleTypeDef htim3;
 
@@ -39,6 +40,7 @@ uint8_t first_value = 0;
 
 uint16_t bufferCounter = 0;
 uint16_t pwm_duty = 16;
+uint32_t rpm_value = 0;
 
 uint8_t motor_running = 0;
 uint8_t motor_commutation_step = 1;
@@ -154,7 +156,10 @@ uint8_t get_motor_commutation_step_minus_1(){
 
 void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
 {
-	static uint32_t counter_10us = 0;
+	static uint32_t counter_10us = 1;
+	static uint32_t counter_10us_1 = 1;
+	static uint32_t pid_loop_period = 100000;
+
 
 	if (htim->Instance == TIM1){
 		if(motor_running == 0) return;
@@ -163,12 +168,30 @@ void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
 	}
     if ((htim->Instance == TIM3)) { //10 us timer
     	counter_10us++;
-    	if((counter_10us % 100000  == 0) & (motor_running == 1)){
+    	if(motor_running == 1) counter_10us_1++;
+    	/*if((counter_10us % 100000  == 0) & (motor_running == 1)){
     		counter_10us = 0;
     		if(pwm_duty < 50){
-    			pwm_duty = pwm_duty + 5;
+    			//pwm_duty = pwm_duty + 5;
     		}
+    	}*/
+
+    	if((counter_10us % 5000) == 0){
+    		rpm_value = (rpm_counter_x10*20); //10'a böl, 60'la çarp
+    		rpm_counter_x10 = 0;
+    		counter_10us = 1;
+    		PID_Loop();
+
     	}
+    	/*
+    	if((counter_10us_1 % pid_loop_period) == 0){
+    		//rpm_value = (rpm_counter_x10 * 0.06); //10'a böl, 60'la çarp
+    		//rpm_counter_x10 = 0;
+    		pid_loop_period = 100000;
+    		counter_10us_1 = 1;
+    		PID_Loop();
+    	}
+    	*/
     }
 }
 
@@ -178,26 +201,29 @@ void motor_step(){
 	if(motor_commutation_step > 6){
 		motor_commutation_step = 1;
 	}
+	//HAL_Delay(1);
 }
 
 void forcedInitialization(){
-	motor_step();
-	HAL_Delay(10);
+	//for(uint8_t i = 0;i<10;i++){ //1 tam tur
+		motor_step();
+		HAL_Delay(10);
 
-	motor_step();
-	HAL_Delay(10);
+		motor_step();
+		HAL_Delay(10);
 
-	motor_step();
-	HAL_Delay(10);
+		motor_step();
+		HAL_Delay(10);
 
-	motor_step();
-	HAL_Delay(10);
+		motor_step();
+		HAL_Delay(10);
 
-	motor_step();
-	HAL_Delay(10);
+		motor_step();
+		HAL_Delay(10);
 
-	motor_step();
-	//HAL_Delay(10);
+		motor_step();
+		//HAL_Delay(10);
+	//}
 
 	motor_running = 1;
 }
@@ -216,13 +242,13 @@ void init_app()
 		//motor_commutation(hall_state);
 #endif
 
-
-
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
 
 	init_uart_debug();
+	init_app_sensorless();
 
 	__HAL_TIM_ENABLE_IT(&htim1, TIM_IT_UPDATE);
+
 	//motor_commutation(com_State);
 	HAL_TIM_Base_Start_IT(&htim3);
 
@@ -231,6 +257,10 @@ void init_app()
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
+
+
 	forcedInitialization();
+
+	app_sensorless_loop();
 
 }

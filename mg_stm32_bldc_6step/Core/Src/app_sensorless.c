@@ -9,18 +9,24 @@
 #include "app_sensorless.h"
 #include "uart_debug.h"
 
-#define ADC_BUFFER_SIZE 3*1
-uint16_t adcBuffer[ADC_BUFFER_SIZE];
+#define ADC_BUFFER_SIZE 100
+uint16_t currentAdcBuffer1[ADC_BUFFER_SIZE];
+uint16_t currentAdcBuffer2[ADC_BUFFER_SIZE];
+uint16_t* sample_current_buffer;
+uint16_t* process_current_buffer;
+uint32_t rpm_counter_x10 = 0;
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
+
 uint32_t adc_value_u = 0, adc_value_v = 0, adc_value_w = 0;
-uint32_t adc_value_cu = 0, adc_value_cv = 0, adc_value_cw = 0;
 static uint8_t bemf_sampling_channel = 0;
-static uint8_t current_sampling_channel = 0;
 
 extern uint8_t motor_commutation_step;
 extern uint8_t motor_running;
+
+float line_current;
+uint8_t f_current_dma_finish = 0;
 
 
 #define CH_U 1
@@ -38,7 +44,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	uint32_t debug_buf[6];
 	static uint8_t debug_cntr = 0;
-	float line_current = 0.0;
 
 	if (hadc->Instance == ADC1)
 	{
@@ -60,80 +65,65 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 				//v low
 				if(adc_value_w > 1700) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 			case 2:
 				// w low
 				if(adc_value_v < 1300) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 			case 3:
 				// w low
 				if(adc_value_u > 1700) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 			case 4:
 				//u low
 				if(adc_value_w < 1300) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 			case 5:
 				//u low
 				if(adc_value_v > 1700) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 			case 6:
 				//v low
 				if(adc_value_u < 1300) {
 					motor_step();
+					rpm_counter_x10++;
 				}
 				break;
 
 			}
 		}
 
-
-	}
-	//
-
-	else if (hadc->Instance == ADC2)
-	{
-		switch(current_sampling_channel){
-		case CH_U:
-			adc_value_cu = HAL_ADC_GetValue(hadc);  // değeri al
-			line_current = calculate_line_current(adc_value_cu);
-			break;
-		case CH_V:
-			adc_value_cv = HAL_ADC_GetValue(hadc);  // değeri al
-			line_current = calculate_line_current(adc_value_cv);
-			break;
-		case CH_W:
-			adc_value_cw = HAL_ADC_GetValue(hadc);  // değeri al
-			line_current = calculate_line_current(adc_value_cw);
-			break;
-		}
-	}
-
-    //
-
-	if ((hadc->Instance == ADC1) || (hadc->Instance == ADC2))
-	{
 		if((debug_cntr++ == 10) & (motor_running == 1)){
 			debug_cntr = 0;
 			debug_buf[0] = adc_value_u;
 			debug_buf[1] = adc_value_v;
 			debug_buf[2] = adc_value_w;
-			debug_buf[3] = (uint32_t)((float)line_current*1000.0f);
+			debug_buf[3] = 0;
 
 
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-			send_UART_CSV_Data(debug_buf,4);
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+			//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+			//send_UART_CSV_Data(debug_buf,4);
+			//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
 		}
+
+	}
+
+	else if (hadc->Instance == ADC2){
+		f_current_dma_finish = 1;
 	}
 }
 
@@ -158,72 +148,66 @@ void conv_adc_bemf(){
 	HAL_ADC_Start_IT(&hadc1);
 }
 
-void conv_adc_current(){
-
-	uint32_t channel;
-
-	switch(current_sampling_channel){
-	case CH_U:
-		channel = 1;//ADC_CHANNEL_1;
-		break;
-	case CH_V:
-		channel = 7;//ADC_CHANNEL_7;
-		break;
-	case CH_W:
-		channel = 6;//ADC_CHANNEL_6;
-		break;
-	}
-
-	ADC2->SQR1 = (channel << 6);
-
-	HAL_ADC_Start_IT(&hadc2);
-}
-
 
 void start_ADC_Sensorless(uint8_t commutation_state){
 	switch (commutation_state){
 	case 1:
 		bemf_sampling_channel = CH_V;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_U;
-		conv_adc_current();
 		break;
 	case 2:
 		bemf_sampling_channel = CH_U;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_V;
-		conv_adc_current();
 		break;
 	case 3:
 		bemf_sampling_channel = CH_W;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_V;
-		conv_adc_current();
 		break;
 	case 4:
 		bemf_sampling_channel = CH_V;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_W;
-		conv_adc_current();
 		break;
 	case 5:
 		bemf_sampling_channel = CH_U;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_W;
-		conv_adc_current();
 		break;
 	case 6:
 		bemf_sampling_channel = CH_W;
 		conv_adc_bemf();
-
-		current_sampling_channel = CH_U;
-		conv_adc_current();
 		break;
 	}
 }
 
+void init_app_sensorless(){
+	process_current_buffer = currentAdcBuffer2;
+	sample_current_buffer = currentAdcBuffer1;
+
+	HAL_ADC_Start_DMA(&hadc2, (uint32_t*)currentAdcBuffer1, ADC_BUFFER_SIZE);
+}
+
+void app_sensorless_loop()
+{
+	while(1){
+		if(f_current_dma_finish == 1){
+			f_current_dma_finish = 0;
+
+			__NOP();
+
+
+			//double buffer
+			/*uint16_t* temp = sample_current_buffer;
+			sample_current_buffer = process_current_buffer;
+			process_current_buffer = temp;*/
+
+			uint32_t sum = 0, mean;
+
+			for(uint8_t i = 0;i<ADC_BUFFER_SIZE;i++){
+				sum += currentAdcBuffer1[i];
+			}
+
+			mean = sum / ADC_BUFFER_SIZE;
+			line_current = calculate_line_current(mean);
+
+		}
+	}
+}

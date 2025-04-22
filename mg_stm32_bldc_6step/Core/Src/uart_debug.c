@@ -32,8 +32,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void send_UART_CSV_Data(uint32_t* buf, uint16_t buf_len){
 	if (uart_tx_ready)
 	{
-		int len = snprintf(uart_buffer, sizeof(uart_buffer), "%lu,%lu,%lu,%lu,%lu,%lu\r\n",
-				pwm_duty,motor_commutation_step, buf[0], buf[1], buf[2], buf[3]);
+		int len = snprintf(uart_buffer, sizeof(uart_buffer), "%lu,%lu,%lu,%lu,%lu\r\n",
+				pwm_duty, buf[0], buf[1], buf[2], buf[3]);
 
 		if (len > 0)
 		{
@@ -43,6 +43,8 @@ void send_UART_CSV_Data(uint32_t* buf, uint16_t buf_len){
 	}
 
 }
+
+
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
