@@ -64,14 +64,6 @@ void PID_Loop()
 
     pwm_duty = temp_pwm_duty;
     //
-	debug_buf[0] = rpm_value;
-	debug_buf[1] = error;
-	debug_buf[2] = pid_output;
-	debug_buf[3] =  target_rpm;
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-	//send_UART_CSV_Data(debug_buf,4);
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-	//
     pid_loop_cntr++;
 }
 
