@@ -7,6 +7,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "app.h"
+#include "app_pid_control.h"
 
 #define CHU 0
 #define CHV 1
@@ -20,6 +21,14 @@ volatile uint16_t hall_state_buf_cntr = 0;
 
 extern UART_HandleTypeDef hlpuart1;
 extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
+
+uint32_t rpm_value = 0;
+
+uint32_t rpm_counter_x10;
+
+extern TIM_HandleTypeDef htim1;
+
 uint8_t rxData_UART;
 
 uint8_t first_value = 0;
@@ -51,7 +60,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	    if((first_value == 1) & (rxData_UART >= 0) & (rxData_UART <= 100))
 	    {
-	    	pwm_duty = rxData_UART;
+	    	//pwm_duty = rxData_UART;
 	    }
 		first_value = 1;
 	}
@@ -85,12 +94,12 @@ uint8_t Read_Hall_Sensors(void) {
 	if (HAL_GPIO_ReadPin(HALL_H2_GPIO_Port, HALL_H2_Pin) == GPIO_PIN_SET) hall_state |= 0x02;
 	if (HAL_GPIO_ReadPin(HALL_H3_GPIO_Port, HALL_H3_Pin) == GPIO_PIN_SET) hall_state |= 0x04;
     */
-	if(readH1() == 1 & readH2() == 0 & readH3() == 0) 		return 1;
-	else if(readH1() == 1 & readH2() == 1 & readH3() == 0) 	return 2;
-	else if(readH1() == 0 & readH2() == 1 & readH3() == 0) 	return 3;
-	else if(readH1() == 0 & readH2() == 1 & readH3() == 1) 	return 4;
-	else if(readH1() == 0 & readH2() == 0 & readH3() == 1) 	return 5;
-	else if(readH1() == 1 & readH2() == 0 & readH3() == 1) 	return 6;
+	if((readH1() == 1) & (readH2() == 0) & ( readH3() == 0)) 		return 1;
+	else if((readH1() == 1) & (readH2() == 1) & (readH3() == 0)) 	return 2;
+	else if((readH1() == 0) & (readH2() == 1) & (readH3() == 0)) 	return 3;
+	else if((readH1() == 0) & (readH2() == 1) & (readH3() == 1)) 	return 4;
+	else if((readH1() == 0) & (readH2() == 0) & (readH3() == 1)) 	return 5;
+	else if((readH1() == 1) & (readH2() == 0) & (readH3() == 1)) 	return 6;
 	else{
 		//fault
 		return 0;
@@ -297,7 +306,7 @@ void StartAppTask(void *argument)
 {
 	uint8_t test_step[6] = {1,2,3,4,5,6};
 
-	pwm_duty = 32;
+	pwm_duty = 16;
 
 	static uint8_t test_step_i = 0;
 	/* Infinite loop */
@@ -329,8 +338,27 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     		if(hall_state_buf_cntr == 100) hall_state_buf_cntr = 0;
     	}
     	motor_commutation(hall_state);
+    	rpm_counter_x10++;
     	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_4);
     }
+}
+void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
+{
+	static uint32_t counter_10us = 1;
+	//static uint32_t counter_10us_1 = 1;
+	//static uint32_t pid_loop_period = 100000;
+	if ((htim->Instance == TIM3)) { //10 us timer
+	    	counter_10us++;
+
+
+	    	if((counter_10us % 5000) == 0){
+	    		rpm_value = (rpm_counter_x10*20); //10'a böl, 60'la çarp
+	    		rpm_counter_x10 = 0;
+	    		counter_10us = 1;
+	    		PID_Loop();
+
+	    	}
+	}
 }
 
 void init_app()
@@ -345,9 +373,14 @@ void init_app()
 	TIM1->CCR2 = 0;
 	TIM1->CCR3 = 0;
 
+	HAL_TIM_Base_Start_IT(&htim3);
+
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+
+	hall_state = Read_Hall_Sensors();
+	motor_commutation(hall_state);
 
 	osThreadNew(StartAppTask, NULL, &appTask_attributes);
 }

@@ -9,5 +9,7 @@
 #define INC_APP_H_
 
 void init_app();
+void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim);
+
 
 #endif /* INC_APP_H_ */
