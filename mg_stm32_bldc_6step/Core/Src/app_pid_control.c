@@ -22,9 +22,9 @@ extern uint32_t rpm_value;
 static float target_rpm = 120.0f;
 static float current_rpm = 0.0f;
 
-static float Kp = 0.02f;
-static float Ki = 0.02f;
-static float Kd = 0.0002f;
+static float Kp = 0.02f;    // 0.02f
+static float Ki = 0.02f;    // 0.02f
+static float Kd = 0.0002f; // 0.0002f
 
 static float error = 0.0f;
 static float previous_error = 0.0f;
@@ -32,7 +32,7 @@ static float integral = 0.0f;
 static float derivative = 0.0f;
 
 static float pid_output = 0.0f;
-static float dt = 0.01f; // PID döngüsü her 10ms'de bir çağrılıyor
+static float dt = 0.05f; // PID döngüsü her 10ms'de bir çağrılıyor
 static uint32_t pid_loop_cntr = 0;
 
 float pid_control(float target, float measured)

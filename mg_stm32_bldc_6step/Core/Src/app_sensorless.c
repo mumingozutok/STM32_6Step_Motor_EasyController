@@ -44,6 +44,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	uint32_t debug_buf[6];
 	static uint8_t debug_cntr = 0;
+	uint32_t max_comm_adc_value = 2200; //1700
+	uint32_t min_comm_adc_value = 1300;
 
 	if (hadc->Instance == ADC1)
 	{
@@ -63,42 +65,42 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			switch(motor_commutation_step){
 			case 1:
 				//v low
-				if(adc_value_w > 1700) {
+				if(adc_value_w > max_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}
 				break;
 			case 2:
 				// w low
-				if(adc_value_v < 1300) {
+				if(adc_value_v < min_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}
 				break;
 			case 3:
 				// w low
-				if(adc_value_u > 1700) {
+				if(adc_value_u > max_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}
 				break;
 			case 4:
 				//u low
-				if(adc_value_w < 1300) {
+				if(adc_value_w < min_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}
 				break;
 			case 5:
 				//u low
-				if(adc_value_v > 1700) {
+				if(adc_value_v > max_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}
 				break;
 			case 6:
 				//v low
-				if(adc_value_u < 1300) {
+				if(adc_value_u < min_comm_adc_value) {
 					motor_step();
 					rpm_counter_x10++;
 				}

@@ -40,6 +40,7 @@ uint8_t first_value = 0;
 
 uint16_t bufferCounter = 0;
 uint16_t pwm_duty = 16;
+uint16_t target_pwm_duty = 18;
 uint32_t rpm_value = 0;
 
 uint8_t motor_running = 0;
@@ -169,12 +170,22 @@ void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
     if ((htim->Instance == TIM3)) { //10 us timer
     	counter_10us++;
     	if(motor_running == 1) counter_10us_1++;
-    	/*if((counter_10us % 100000  == 0) & (motor_running == 1)){
+    	/*
+    	if((counter_10us % 100000  == 0) & (motor_running == 1)){
+    		rpm_value = (rpm_counter_x10); //10'a böl, 60'la çarp
+    		rpm_counter_x10 = 0;
     		counter_10us = 0;
-    		if(pwm_duty < 50){
-    			//pwm_duty = pwm_duty + 5;
+
+    		if(target_pwm_duty > 95)target_pwm_duty = 95;
+    		if(target_pwm_duty < 16)target_pwm_duty = 16;
+
+    		if(pwm_duty < target_pwm_duty){
+    			pwm_duty = pwm_duty + 1;
     		}
-    	}*/
+
+    	}
+    	*/
+
 
     	if((counter_10us % 5000) == 0){
     		rpm_value = (rpm_counter_x10*20); //10'a böl, 60'la çarp
@@ -183,6 +194,7 @@ void HAL_TIM_PeriodElapsedCallback_App(TIM_HandleTypeDef *htim)
     		PID_Loop();
 
     	}
+
     	/*
     	if((counter_10us_1 % pid_loop_period) == 0){
     		//rpm_value = (rpm_counter_x10 * 0.06); //10'a böl, 60'la çarp
