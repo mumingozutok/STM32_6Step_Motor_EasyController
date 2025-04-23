@@ -15,7 +15,7 @@ extern TIM_HandleTypeDef htim1;
 uint8_t rxData_UART;
 
 uint8_t first_value = 0;
-uint16_t pwm_duty = 20;
+uint16_t pwm_duty = 10;
 uint16_t target_pwm_duty = 20;
 volatile uint8_t motor_running = 0;
 
@@ -144,7 +144,7 @@ volatile uint32_t speed_counter_now= 0;
 volatile uint32_t speed_counter_old= 0;
 
 float rpm_measured = 0;
-float rpm_value;
+uint32_t rpm_value;
 float time_delta; //x*100us
 float period;
 
@@ -282,21 +282,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  counter_100us_1++;
 
 	  if((counter_100us % 1000) == 0){ //100ms
-		  if(target_pwm_duty <99){
+		  /*if(target_pwm_duty <99){
 			  if((pwm_duty<target_pwm_duty) & motor_running) {
 				  pwm_duty++;
 			  }
 			  else if((pwm_duty>target_pwm_duty) & motor_running) {
 				  pwm_duty--;
 			  }
-		  }
+		  }*/
 	  }
 
   	if(((counter_100us_1 % 1000) == 0) & (motor_running == 1)){ //100 ms
   		rpm_value = (rpm_counter_x60)*10;
   		rpm_counter_x60 = 0;
   		counter_100us_1 = 1;
-  		//PID_Loop();
+  		PID_Loop();
 
   	}
   }

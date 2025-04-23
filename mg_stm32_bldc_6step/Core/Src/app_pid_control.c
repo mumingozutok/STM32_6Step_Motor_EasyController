@@ -9,8 +9,8 @@
 #include "main.h"
 #include "app_pid_control.h"
 
-#define PID_MAX_PWM 95
-#define PID_MIN_PWM 15
+#define PID_MAX_PWM 60
+#define PID_MIN_PWM 7
 
 extern uint16_t pwm_duty;
 extern uint32_t rpm_value;
@@ -18,12 +18,12 @@ extern uint32_t rpm_value;
 
 //output = Kp * error + Ki * integral + Kd * derivative;
 
-static float target_rpm = 120.0f;
+static float target_rpm = 170.0f;
 static float current_rpm = 0.0f;
 
 static float Kp = 0.02f;
-static float Ki = 0.02f;
-static float Kd = 0.0002f;
+static float Ki = 0.01f;//0.02f;
+static float Kd = 0.0f;//0.0002f;
 
 static float error = 0.0f;
 static float previous_error = 0.0f;
@@ -31,7 +31,7 @@ static float integral = 0.0f;
 static float derivative = 0.0f;
 
 static float pid_output = 0.0f;
-static float dt = 1.0f; // PID döngüsü her 10ms'de bir çağrılıyor
+static float dt = 0.1f; // PID döngüsü her 10ms'de bir çağrılıyor
 static uint32_t pid_loop_cntr = 0;
 
 float pid_control(float target, float measured)
