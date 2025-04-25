@@ -7,9 +7,10 @@
 
 
 #include "main.h"
+#include "app.h"
 #include "app_pid_control.h"
 
-#define PID_MAX_PWM 60
+#define PID_MAX_PWM 80
 #define PID_MIN_PWM 7
 
 extern uint16_t pwm_duty;
@@ -62,15 +63,18 @@ void PID_Loop()
     if (temp_pwm_duty < PID_MIN_PWM) temp_pwm_duty = PID_MIN_PWM;
 
     pwm_duty = temp_pwm_duty;
-    /*
+/*
 	debug_buf[0] = rpm_value;
-	debug_buf[1] = error;
+	debug_buf[1] = pwm_duty;
 	debug_buf[2] = pid_output;
-	debug_buf[3] =  target_rpm;
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-	send_UART_CSV_Data(debug_buf,4);
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-	*/
+	debug_buf[3] =  target_rpm;*/
+
+	//send_UART_CSV_Data(debug_buf,4);
+
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+	//send_UART_CSV_Data(debug_buf,4);
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+
 	//
     pid_loop_cntr++;
 }

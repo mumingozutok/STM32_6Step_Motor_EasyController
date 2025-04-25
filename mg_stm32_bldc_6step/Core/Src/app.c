@@ -12,7 +12,6 @@ extern TIM_HandleTypeDef htim3;
 
 extern UART_HandleTypeDef hlpuart1;
 extern TIM_HandleTypeDef htim1;
-uint8_t rxData_UART;
 
 uint8_t first_value = 0;
 uint16_t pwm_duty = 10;
@@ -55,35 +54,6 @@ void buildCommutationTable()
 }
 
 //#define TEST_ENCODER
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if (huart->Instance == LPUART1)
-	{
-		/*
-		HAL_UART_Transmit(&hlpuart1, &rxData_UART, 1, HAL_MAX_DELAY);
-		HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
-
-	    if((first_value == 1) & (rxData_UART >= 0) & (rxData_UART <= 100))
-	    {
-	    	if(pwm_duty == 0)
-	    	{
-	    		//pwm_duty = rxData_UART;
-
-	    		//hall_state = Read_Hall_Sensors();
-	    		//motor_commutation(hall_state);
-	    	}
-	    	else
-	    	{
-	    		//pwm_duty = rxData_UART;
-	    	}
-
-
-	    }
-		first_value = 1;
-		 */
-	}
-}
 
 void set_mosfets(uint16_t duty, uint8_t uh, uint8_t vh, uint8_t wh, uint8_t ul, uint8_t vl, uint8_t wl)
 {
@@ -210,17 +180,6 @@ void reset_encoder_value(){
 #endif
 }
 
-void send_debug_struct_over_uart(sEncCommDebug *data)
-{
-	char uart_buf[64];
-	int len = snprintf(uart_buf, sizeof(uart_buf), "%u,%u,%u\r\n",
-			data->encoder_position,
-			data->comm_step,
-			data->loop_state);
-
-	HAL_UART_Transmit(&hlpuart1, (uint8_t *)uart_buf, len, HAL_MAX_DELAY);
-}
-
 volatile int32_t encoder_count;
 uint16_t encoder_shaft_pos; //this is the shaft position as encoder counts
 uint16_t encoder_commutation_pos; //this is shaft position from the beginning of current commuatiton sequence.
@@ -310,7 +269,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void init_app()
 {
-	HAL_UART_Receive_IT(&hlpuart1, &rxData_UART, 1);
+	init_uart_debug();
+
 	encoder_init();
 
 	HAL_TIM_Base_Start_IT(&htim2);
@@ -325,6 +285,7 @@ void init_app()
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+
 
 	init_Encoder();
 

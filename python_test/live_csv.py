@@ -1,30 +1,57 @@
 import serial
 import csv
-import time
+from datetime import datetime
+import os
 
-# Port ayarları
-port = "COM4"
-baudrate = 115200
-filename = f"enc_log_{int(time.time())}.csv"
+# Seri port ayarları
+SERIAL_PORT = 'COM5'        # kendi portuna göre değiştir
+BAUD_RATE = 921600
 
-# Seriyi başlat
-ser = serial.Serial(port, baudrate, timeout=1)
+# Zaman damgası ile eşsiz dosya ismi oluştur
+timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+CSV_FILENAME = f'rpm_log_{timestamp_str}.csv'
 
-# CSV dosyası oluştur
-with open(filename, mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(["Timestamp", "Encoder Position", "Commutation Step", "Loop State"])  # Başlık
+# Seri portu aç
+ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
 
-    print("Veri kaydediliyor... Ctrl+C ile çıkabilirsiniz.")
+# CSV dosyasını oluştur ve başlıkları yaz
+with open(CSV_FILENAME, mode='w', newline='') as csv_file:
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow([
+        'Timestamp',
+        'rpm_value',
+        'pwm_duty',        
+        'pid_output',
+        'target_rpm'
+    ])
+
+    print(f"[{datetime.now()}] Kayıt başladı: {CSV_FILENAME} (Çıkmak için Ctrl+C)")
+
     try:
         while True:
             line = ser.readline().decode('utf-8').strip()
+
             if line:
-                parts = line.split(',')
-                if len(parts) == 3:
-                    timestamp = time.time()
-                    writer.writerow([timestamp] + parts)
-                    print(f"{timestamp:.2f} | {parts}")
+                try:
+                    parts = list(map(int, line.split(',')))
+                    if len(parts) == 4:
+                        rpm_value, pwm_duty, pid_output, target_rpm = parts
+                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                        csv_writer.writerow([
+                            timestamp,
+                            rpm_value,
+                            pwm_duty,                            
+                            pid_output,
+                            target_rpm,
+
+                        ])
+                        print(f"{timestamp} -> H:{rpm_value},  U:{pwm_duty}, W:{pid_output}, Iu:{target_rpm}")
+                    else:
+                        print(f"Format hatası (4 değil {len(parts)} değer): {line}")
+                except ValueError:
+                    print(f"Hatalı veri: {line}")
+
     except KeyboardInterrupt:
-        print("\nKayıt tamamlandı. Dosya:", filename)
-        ser.close()
+        print("\nKayıt durduruldu.")
+
+ser.close()
