@@ -8,6 +8,6 @@
 #ifndef INC_APP_PID_CONTROL_H_
 #define INC_APP_PID_CONTROL_H_
 
-
+float PID_Loop();
 
 #endif /* INC_APP_PID_CONTROL_H_ */

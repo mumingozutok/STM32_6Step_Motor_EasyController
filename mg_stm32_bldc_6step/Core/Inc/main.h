@@ -77,6 +77,8 @@ void Error_Handler(void);
 #define ENCO_Z_Pin GPIO_PIN_10
 #define ENCO_Z_GPIO_Port GPIOB
 #define ENCO_Z_EXTI_IRQn EXTI15_10_IRQn
+#define DEBUG_PIN_Pin GPIO_PIN_8
+#define DEBUG_PIN_GPIO_Port GPIOC
 #define PWM_UH_Pin GPIO_PIN_8
 #define PWM_UH_GPIO_Port GPIOA
 #define PWM_VH_Pin GPIO_PIN_9
@@ -89,6 +91,12 @@ void Error_Handler(void);
 #define T_SWCLK_GPIO_Port GPIOA
 #define ENCO_A_Pin GPIO_PIN_15
 #define ENCO_A_GPIO_Port GPIOA
+#define EN1_Pin GPIO_PIN_10
+#define EN1_GPIO_Port GPIOC
+#define EN2_Pin GPIO_PIN_11
+#define EN2_GPIO_Port GPIOC
+#define EN3_Pin GPIO_PIN_12
+#define EN3_GPIO_Port GPIOC
 #define ENCO_B_Pin GPIO_PIN_3
 #define ENCO_B_GPIO_Port GPIOB
 
